@@ -1,0 +1,20 @@
+{
+  "name": "page-audit",
+  "version": "2.0.0",
+  "description": "Full-site audit tool (links, images, robots.txt, sitemap, security headers, bot-challenge detection) powered by Camoufox + Playwright",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "audit": "node audit.js",
+    "postinstall": "camoufox-js fetch || echo 'Run: npx camoufox-js fetch (browser not downloaded yet)'"
+  },
+  "dependencies": {
+    "camoufox-js": "latest",
+    "playwright-core": "^1.49.0",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
