@@ -61,7 +61,7 @@ async function auditUrl(rawUrl) {
 
   try {
     const response = await page.goto(url, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
 
