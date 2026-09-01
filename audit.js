@@ -1,130 +1,83 @@
-const { Camoufox } = require('camoufox');
+#!/usr/bin/env node
+import { runAudit } from './auditor.js';
+import { writeFile } from 'node:fs/promises';
 
-/**
- * Normalizes input string to an absolute URL format.
- */
-function normalizeUrl(input) {
-    if (!input || typeof input !== 'string') return null;
-    let urlStr = input.trim();
-    if (!/^https?:\/\//i.test(urlStr)) {
-        urlStr = 'https://' + urlStr;
+function parseArgs(argv) {
+  const args = { _: [] };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--out' || a === '-o') {
+      args.out = argv[++i];
+    } else if (a === '--headed') {
+      args.headless = false;
+    } else if (a === '--no-humanize') {
+      args.humanize = false;
+    } else if (a === '--timeout') {
+      args.navTimeout = parseInt(argv[++i], 10);
+    } else if (a === '--skip-robots') {
+      args.skipRobots = true;
+    } else if (a === '--skip-sitemap') {
+      args.skipSitemap = true;
+    } else if (a === '--help' || a === '-h') {
+      args.help = true;
+    } else {
+      args._.push(a);
     }
-    try {
-        return new URL(urlStr).href;
-    } catch (e) {
-        return null;
-    }
+  }
+  return args;
 }
 
-/**
- * Audits a target URL using an anti-fingerprint browser engine.
- */
-async function auditUrl(inputUrl) {
-    const targetUrl = normalizeUrl(inputUrl);
-    if (!targetUrl) {
-        return { error: "Invalid URL provided." };
-    }
+function printHelp() {
+  console.log(`page-audit — full-site audit (links, images, robots.txt, sitemap, security headers)
 
-    const report = {
-        url: targetUrl,
-        finalUrl: null,
-        statusCode: null,
-        ok: false,
-        title: null,
-        description: null,
-        linksCount: 0,
-        imagesCount: 0,
-        securityHeaders: {
-            "content-security-policy": null,
-            "strict-transport-security": null,
-            "x-frame-options": null,
-            "x-content-type-options": null,
-            "referrer-policy": null,
-            "permissions-policy": null,
-            "x-xss-protection": null
-        },
-        error: null,
-        timestamp: new Date().toISOString()
-    };
+Usage:
+  node audit.js <url> [options]
 
-    let browser = null;
-    try {
-        // Launch Camoufox using the native configuration object structure
-        browser = await Camoufox.launch({
-            headless: true,
-            fingerprintOptions: {
-                modifyFeatures: true,
-                randomizeMemory: true
-            }
-        });
+Options:
+  --out, -o <file>     Write JSON report to a file instead of stdout
+  --headed             Run with a visible browser window (debugging)
+  --no-humanize         Disable Camoufox's human-like cursor/typing behavior
+  --timeout <ms>        Navigation timeout in ms (default 30000)
+  --skip-robots         Don't audit robots.txt
+  --skip-sitemap        Don't audit sitemap.xml
+  --help, -h             Show this help
 
-        const context = await browser.newContext({
-            ignoreHTTPSErrors: true
-        });
-
-        const page = await context.newPage();
-
-        // Capture headers dynamically on redirection pathways
-        let mainResponse = null;
-        page.on('response', (response) => {
-            const resUrl = response.url().replace(/\/$/, "");
-            const checkUrl = targetUrl.replace(/\/$/, "");
-            if (resUrl === checkUrl || response.request().isNavigationRequest()) {
-                mainResponse = response;
-            }
-        });
-
-        const navigationResponse = await page.goto(targetUrl, {
-            waitUntil: 'domcontentloaded',
-            timeout: 30000
-        });
-
-        const finalResponse = mainResponse || navigationResponse;
-
-        if (finalResponse) {
-            report.statusCode = finalResponse.status();
-            report.ok = finalResponse.ok();
-            report.finalUrl = page.url();
-
-            const headers = finalResponse.headers();
-            Object.keys(report.securityHeaders).forEach(headerName => {
-                report.securityHeaders[headerName] = headers[headerName.toLowerCase()] || null;
-            });
-        }
-
-        // Monitor if a Cloudflare verification widget is actively computing fingerprints
-        const cloudflareFrame = page.frames().find(f => f.url().includes('://cloudflare.com'));
-        if (cloudflareFrame) {
-            // Sleep briefly to let Turnstile clear the session context seamlessly
-            await page.waitForTimeout(5000);
-        }
-
-        // Ensure stability without crashing if analytics trackers hang
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-        // Process SEO fields safely
-        report.title = await page.title().catch(() => null);
-        
-        report.description = await page.evaluate(() => {
-            const meta = document.querySelector('meta[name="description"]') || 
-                         document.querySelector('meta[property="og:description"]');
-            return meta ? meta.getAttribute('content') : null;
-        }).catch(() => null);
-
-        report.linksCount = await page.evaluate(() => document.querySelectorAll('a[href]').length).catch(() => 0);
-        report.imagesCount = await page.evaluate(() => document.querySelectorAll('img').length).catch(() => 0);
-
-        return report;
-
-    } catch (err) {
-        report.error = err.message;
-        return report;
-    } finally {
-        if (browser) {
-            await browser.close();
-        }
-    }
+Example:
+  node audit.js example.com
+  node audit.js https://example.com --out report.json
+`);
 }
 
-// Export module for server.js consumption
-module.exports = { auditUrl };
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+
+  if (args.help || args._.length === 0) {
+    printHelp();
+    process.exit(args.help ? 0 : 1);
+  }
+
+  const target = args._[0];
+  const report = await runAudit(target, {
+    navTimeout: args.navTimeout,
+    headless: args.headless,
+    humanize: args.humanize,
+    skipRobots: args.skipRobots,
+    skipSitemap: args.skipSitemap,
+  });
+
+  const json = JSON.stringify(report, null, 2);
+
+  if (args.out) {
+    await writeFile(args.out, json, 'utf8');
+    console.log(`Report written to ${args.out}`);
+  } else {
+    console.log(json);
+  }
+
+  process.exit(report.ok ? 0 : 1);
+}
+
+main().catch((err) => {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});
