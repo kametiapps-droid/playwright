@@ -17,7 +17,7 @@ function normalizeUrl(input) {
 }
 
 /**
- * Core auditing function exposed to the HTTP router
+ * Audits a target URL using an anti-fingerprint browser engine.
  */
 async function auditUrl(inputUrl) {
     const targetUrl = normalizeUrl(inputUrl);
@@ -49,7 +49,7 @@ async function auditUrl(inputUrl) {
 
     let browser = null;
     try {
-        // Launch the open-source stealth engine
+        // Launch Camoufox using the native configuration object structure
         browser = await Camoufox.launch({
             headless: true,
             fingerprintOptions: {
@@ -64,16 +64,16 @@ async function auditUrl(inputUrl) {
 
         const page = await context.newPage();
 
+        // Capture headers dynamically on redirection pathways
         let mainResponse = null;
         page.on('response', (response) => {
             const resUrl = response.url().replace(/\/$/, "");
             const checkUrl = targetUrl.replace(/\/$/, "");
-            if (resUrl === checkUrl) {
+            if (resUrl === checkUrl || response.request().isNavigationRequest()) {
                 mainResponse = response;
             }
         });
 
-        // Navigate with custom timeouts
         const navigationResponse = await page.goto(targetUrl, {
             waitUntil: 'domcontentloaded',
             timeout: 30000
@@ -92,16 +92,17 @@ async function auditUrl(inputUrl) {
             });
         }
 
-        // Wait dynamically if a Cloudflare Turnstile challenge container is seen
+        // Monitor if a Cloudflare verification widget is actively computing fingerprints
         const cloudflareFrame = page.frames().find(f => f.url().includes('://cloudflare.com'));
         if (cloudflareFrame) {
+            // Sleep briefly to let Turnstile clear the session context seamlessly
             await page.waitForTimeout(5000);
         }
 
-        // Catch network stability thresholds safely to avoid crashing on lazy-loading analytic sockets
+        // Ensure stability without crashing if analytics trackers hang
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        // Gather DOM nodes
+        // Process SEO fields safely
         report.title = await page.title().catch(() => null);
         
         report.description = await page.evaluate(() => {
@@ -125,5 +126,5 @@ async function auditUrl(inputUrl) {
     }
 }
 
-// Export module function for server.js compatibility
+// Export module for server.js consumption
 module.exports = { auditUrl };
