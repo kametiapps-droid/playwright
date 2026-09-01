@@ -21,6 +21,7 @@ const server = http.createServer(async (req, res) => {
     return res.end();
   }
 
+  // Health and fallback endpoint check
   if (req.method === "GET" && (req.url === "/" || req.url === "/health")) {
     return sendJson(res, 200, {
       ok: true,
@@ -29,11 +30,13 @@ const server = http.createServer(async (req, res) => {
     });
   }
 
+  // Core Audit routing execution
   if (req.method === "POST" && req.url === "/audit") {
     let body = "";
 
     req.on("data", chunk => {
       body += chunk;
+      // Protect from large buffer overflow injections
       if (body.length > 10000) req.destroy();
     });
 
@@ -49,13 +52,15 @@ const server = http.createServer(async (req, res) => {
           });
         }
 
+        // Call the imported Camoufox engine module
         const result = await auditUrl(url);
 
+        // Standardizing response status depending on background error payload tracking
         return sendJson(res, result.error ? 422 : 200, result);
       } catch (error) {
         return sendJson(res, 500, {
           ok: false,
-          error: error.message,
+          error: "Invalid JSON format or stream error: " + error.message,
         });
       }
     });
