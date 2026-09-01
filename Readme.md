@@ -72,6 +72,6 @@ The image is based on `mcr.microsoft.com/playwright:v1.47.0-jammy`, which ships 
 
 ## Notes
 
-- Uses `networkidle` wait strategy with a 30s timeout — adjust in `audit.js` for slower sites.
+- Uses `networkidle` wait strategy with a 30s timeout — adjust in `audit.js` for slower sites..
 - `ignoreHTTPSErrors: true` is set so audits of misconfigured-TLS sites still complete.
 - On navigation failure, `error` is populated and the process exits with code 1; other fields remain `null`.
