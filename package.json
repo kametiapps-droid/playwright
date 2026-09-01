@@ -1,0 +1,12 @@
+{
+  "name": "backlinkbase-playwright-worker",
+  "version": "1.0.0",
+  "description": "BacklinkBase Playwright website audit worker",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "playwright": "^1.47.0"
+  }
+}
