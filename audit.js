@@ -1,12 +1,10 @@
-#!/usr/bin/env node
-
 const { Camoufox } = require('camoufox');
 
 /**
  * Normalizes input string to an absolute URL format.
- * Defaults to 'https://' protocol if missing.
  */
 function normalizeUrl(input) {
+    if (!input || typeof input !== 'string') return null;
     let urlStr = input.trim();
     if (!/^https?:\/\//i.test(urlStr)) {
         urlStr = 'https://' + urlStr;
@@ -19,22 +17,14 @@ function normalizeUrl(input) {
 }
 
 /**
- * Main function to execute website audit using Camoufox stealth profile.
+ * Core auditing function exposed to the HTTP router
  */
-async function runAudit() {
-    const args = process.argv.slice(2);
-    if (args.length === 0) {
-        console.error(JSON.stringify({ error: "Please provide a URL. Example: node audit.js example.com" }));
-        process.exit(1);
-    }
-
-    const targetUrl = normalizeUrl(args[0]);
+async function auditUrl(inputUrl) {
+    const targetUrl = normalizeUrl(inputUrl);
     if (!targetUrl) {
-        console.error(JSON.stringify({ error: "Invalid URL provided." }));
-        process.exit(1);
+        return { error: "Invalid URL provided." };
     }
 
-    // Initialize structured output tracking standard schema
     const report = {
         url: targetUrl,
         finalUrl: null,
@@ -59,7 +49,7 @@ async function runAudit() {
 
     let browser = null;
     try {
-        // Launch anti-fingerprinting stealth browser profile natively
+        // Launch the open-source stealth engine
         browser = await Camoufox.launch({
             headless: true,
             fingerprintOptions: {
@@ -69,12 +59,11 @@ async function runAudit() {
         });
 
         const context = await browser.newContext({
-            ignoreHTTPSErrors: true // Matches your original TLS settings
+            ignoreHTTPSErrors: true
         });
 
         const page = await context.newPage();
 
-        // Track network response maps to catch the primary target document status
         let mainResponse = null;
         page.on('response', (response) => {
             const resUrl = response.url().replace(/\/$/, "");
@@ -84,7 +73,7 @@ async function runAudit() {
             }
         });
 
-        // Navigate directly to destination
+        // Navigate with custom timeouts
         const navigationResponse = await page.goto(targetUrl, {
             waitUntil: 'domcontentloaded',
             timeout: 30000
@@ -97,25 +86,22 @@ async function runAudit() {
             report.ok = finalResponse.ok();
             report.finalUrl = page.url();
 
-            // Extract security headers into predefined keys mapping
             const headers = finalResponse.headers();
             Object.keys(report.securityHeaders).forEach(headerName => {
                 report.securityHeaders[headerName] = headers[headerName.toLowerCase()] || null;
             });
         }
 
-        // Wait to allow automated Turnstile verification context clearance to resolve
+        // Wait dynamically if a Cloudflare Turnstile challenge container is seen
         const cloudflareFrame = page.frames().find(f => f.url().includes('://cloudflare.com'));
         if (cloudflareFrame) {
             await page.waitForTimeout(5000);
         }
 
         // Catch network stability thresholds safely to avoid crashing on lazy-loading analytic sockets
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
-            // Suppress background script persistence timeouts gracefully
-        });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        // Parse DOM structural properties safely
+        // Gather DOM nodes
         report.title = await page.title().catch(() => null);
         
         report.description = await page.evaluate(() => {
@@ -127,13 +113,11 @@ async function runAudit() {
         report.linksCount = await page.evaluate(() => document.querySelectorAll('a[href]').length).catch(() => 0);
         report.imagesCount = await page.evaluate(() => document.querySelectorAll('img').length).catch(() => 0);
 
-        // Success JSON print output
-        console.log(JSON.stringify(report, null, 2));
+        return report;
 
     } catch (err) {
         report.error = err.message;
-        console.log(JSON.stringify(report, null, 2));
-        process.exit(1);
+        return report;
     } finally {
         if (browser) {
             await browser.close();
@@ -141,4 +125,5 @@ async function runAudit() {
     }
 }
 
-runAudit();
+// Export module function for server.js compatibility
+module.exports = { auditUrl };
