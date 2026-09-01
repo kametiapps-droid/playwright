@@ -2,7 +2,7 @@
 
 Full-site audit worker (SEO metadata, links, images, robots.txt, sitemap, security
 headers, bot-challenge detection) powered by **Camoufox** (anti-fingerprint Firefox)
-driven through `playwright-core`.
+driven through `playwright-core`..
 
 ## Requirements
 
