@@ -68,7 +68,7 @@ async function auditUrl(rawUrl) {
     if (!response) {
       throw new Error('No response received from page.goto');
     }
-
+await page.waitForTimeout(2000);
     result.finalUrl = page.url();
     result.statusCode = response.status();
     result.ok = response.ok();
