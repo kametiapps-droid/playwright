@@ -1,20 +1,21 @@
 {
   "name": "page-audit",
-  "version": "2.0.0",
-  "description": "Full-site audit tool (links, images, robots.txt, sitemap, security headers, bot-challenge detection) powered by Camoufox + Playwright",
+  "version": "2.0.1",
+  "description": "Full-site audit tool (links, images, robots.txt, sitemap, security headers, bot-challenge detection) powered by Camoufox",
   "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "audit": "node audit.js",
-    "postinstall": "camoufox-js fetch || echo 'Run: npx camoufox-js fetch (browser not downloaded yet)'"
+    "fetch-browser": "camoufox-js fetch"
   },
   "dependencies": {
-    "camoufox-js": "latest",
-    "playwright-core": "^1.49.0",
-    "express": "^4.19.2"
+    "camoufox-js": "0.12.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "playwright-core": "1.60.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   }
 }
